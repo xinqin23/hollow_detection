@@ -58,7 +58,7 @@ The Overwatch dataset consists of in-game screenshots of 14 characters: Ashe, Ba
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{../results/overwatch_showcase_grid.png}
-    \caption{Overwatch character samples (resized to $224\times224$).}
+    \caption{Overwatch character samples ($224\times224$). Each cell shows one test image per character class. The 14 characters span a variety of body types, color palettes, and in-game poses.}
     \label{fig:ow_showcase}
 \end{figure}
 
@@ -177,6 +177,24 @@ Figure~\ref{fig:ow_perclass} shows that character recognition accuracy varies wi
     \includegraphics[width=\textwidth]{../results/overwatch_training_curves.png}
     \caption{Overwatch: Training loss and validation accuracy over epochs.}
     \label{fig:ow_curves}
+\end{figure}
+
+\subsection{Qualitative Examples}
+
+To better understand model behavior, we show concrete prediction examples from YOLOv8n in Figures~\ref{fig:ow_correct} and~\ref{fig:ow_incorrect}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../results/overwatch_correct_examples.png}
+    \caption{Correctly classified examples by YOLOv8n. Green labels indicate the true (and predicted) class. The model succeeds when the character is clearly visible, centrally framed, or has distinctive visual features (e.g., Bastion's robotic silhouette, Tracer's pose).}
+    \label{fig:ow_correct}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../results/overwatch_incorrect_examples.png}
+    \caption{Misclassified examples by YOLOv8n. Red labels show ``True $\rightarrow$ Predicted''. Common failure modes include heavy occlusion, similar-looking environments dominating the frame, and characters partially out of view or blending with the background.}
+    \label{fig:ow_incorrect}
 \end{figure}
 
 \section{Discussion}
