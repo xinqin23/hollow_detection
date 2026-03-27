@@ -17,7 +17,7 @@
 \maketitle
 
 \begin{abstract}
-We investigate how well vision models can classify images using only shape outlines (Canny edge contours) compared to full-color originals. We compare two architectures---DINOv2 (a self-supervised Vision Transformer) and YOLOv8n-cls (a lightweight CNN classifier)---on CIFAR-10 in both original and contour-only form. Both models achieve $\sim$96\% on originals but diverge sharply on contours: YOLOv8n retains 70.4\% while DINOv2 drops to 51.6\%. We further evaluate both models on a custom Overwatch character recognition dataset (14 classes), where YOLOv8n achieves 65.8\% and DINOv2 achieves 56.5\%. Across experiments, fine-tuned CNNs consistently outperform frozen self-supervised features.
+We investigate how well vision models can classify images using only shape outlines (Canny edge contours) compared to full-color originals. We compare two architectures---DINOv2 (a self-supervised Vision Transformer) and YOLOv8n-cls (a lightweight CNN classifier)---on CIFAR-10 in both original and contour-only form. Both models achieve $\sim$96\% on originals but diverge sharply on contours: YOLOv8n retains 70.4\% while DINOv2 drops to 51.6\%. We further evaluate both models on a custom Overwatch character recognition dataset (14 classes), where YOLOv8n achieves 65.8\% and DINOv2 achieves 56.5\%. Finally, we test on the TU-Berlin Sketch Dataset~\cite{eitz2012humans} (250 categories of human-drawn sketches), where DINOv2 achieves 74.4\% and YOLOv8n achieves 64.5\%---reversing the pattern seen on Canny contours and suggesting that self-supervised ViT features are better suited to abstract, semantic shape representations.
 \end{abstract}
 
 \section{Introduction}
@@ -30,6 +30,7 @@ In this study, we test this claim empirically using two datasets and two contras
 \begin{itemize}
     \item \textbf{CIFAR-10}: A standard 10-class object recognition benchmark (50k train, 10k test; native $32\times32$). We evaluate on both original images and Canny edge contour versions.
     \item \textbf{Overwatch Frames}: A custom 14-class dataset of game character screenshots (1,309 train, 336 test; native $3420\times2138$), containing both normal and partially occluded views. We train directly on this dataset to evaluate character recognition.
+    \item \textbf{TU-Berlin Sketch Dataset}: 20,000 human-drawn sketches across 250 object categories~\cite{eitz2012humans} (16,064 train, 4,016 test). These crowd-sourced sketches are pure shape representations---no color, no texture---providing a direct test of how well each model handles abstract shape information.
 \end{itemize}
 
 \textbf{Models:}
@@ -197,17 +198,75 @@ To better understand model behavior, we show concrete prediction examples from Y
     \label{fig:ow_incorrect}
 \end{figure}
 
+\section{Results: TU-Berlin Sketch Dataset}
+
+The TU-Berlin Sketch Dataset~\cite{eitz2012humans} contains 20,000 human-drawn sketches crowdsourced via Amazon Mechanical Turk, evenly distributed across 250 everyday object categories (80 sketches per category). Unlike Canny edge contours, which are algorithmically extracted from photographs, these sketches are \emph{human abstractions}---they capture how people represent objects through simplified, iconic line drawings. This makes them an ideal test of whether models can recognize objects from semantic shape alone.
+
+\subsection{Overall Accuracy}
+
+\begin{table}[H]
+    \centering
+    \caption{Test accuracy (\%) on TU-Berlin Sketch Dataset (250 classes, random baseline = 0.4\%).}
+    \label{tab:sketch_accuracy}
+    \begin{tabular}{lc}
+        \toprule
+        \textbf{Model} & \textbf{Accuracy} \\
+        \midrule
+        DINOv2 (ViT-S/14, frozen + linear) & 74.43 \\
+        YOLOv8n-cls (fine-tuned) & 64.49 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Notably, DINOv2 \emph{outperforms} YOLOv8n by nearly 10 percentage points on sketches---the opposite of the pattern observed on CIFAR-10 contours (where YOLO led by 19 points) and Overwatch (where YOLO led by 9 points). Both models far exceed the 0.4\% random baseline across 250 classes.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{../results/sketch_accuracy_comparison.png}
+    \caption{TU-Berlin Sketch: Overall accuracy comparison.}
+    \label{fig:sketch_accuracy}
+\end{figure}
+
+\subsection{Showcase}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../results/sketch_showcase_grid.png}
+    \caption{Sample sketches from 20 of 250 categories. Each sketch is a crowd-sourced human drawing---note the wide variation in style, abstraction level, and drawing quality within each category.}
+    \label{fig:sketch_showcase}
+\end{figure}
+
+\subsection{Per-Class Analysis}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../results/sketch_per_class_accuracy.png}
+    \caption{TU-Berlin Sketch: Top and bottom 20 classes by per-class recall for each model.}
+    \label{fig:sketch_perclass}
+\end{figure}
+
+\subsection{Training Curves}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../results/sketch_training_curves.png}
+    \caption{TU-Berlin Sketch: Training loss and validation accuracy over epochs. DINOv2 converges quickly (within $\sim$10 epochs) and maintains a stable lead throughout training.}
+    \label{fig:sketch_curves}
+\end{figure}
+
 \section{Discussion}
 
 \subsection{Fine-tuning vs.\ Frozen Features}
 
-Across both datasets, YOLOv8n-cls (fully fine-tuned) consistently outperforms DINOv2 (frozen backbone + linear probe). On CIFAR-10 originals the gap is small ($<$1\%), but it widens on harder tasks: 19 points on CIFAR-10 contours and 9 points on Overwatch.
+On CIFAR-10 and Overwatch, YOLOv8n-cls (fully fine-tuned) outperforms DINOv2 (frozen backbone + linear probe). On CIFAR-10 originals the gap is small ($<$1\%), but it widens on harder tasks: 19 points on CIFAR-10 contours and 9 points on Overwatch. However, the TU-Berlin sketch results complicate this narrative: DINOv2 outperforms the fine-tuned YOLOv8n by 10 points on human sketches, despite using only a linear probe.
 
-The key factor is \emph{adaptation}. DINOv2's self-supervised features are powerful general-purpose representations, but a linear probe cannot reshape them for domains that differ substantially from natural images. Full fine-tuning, as in YOLOv8n, allows the model to adapt all layers---including low-level edge detectors and mid-level texture encoders---to the specific characteristics of the target data.
+This suggests that the advantage of fine-tuning depends on the \emph{domain gap}. When input data resembles natural images (photographs, game screenshots, even algorithmically extracted edges), fine-tuning is essential. But when the input is more abstract---as with human sketches---DINOv2's self-supervised features may already encode the right level of semantic abstraction, and a simple linear probe suffices.
 
-\subsection{Shape Information in Contours}
+\subsection{Shape Information: Algorithmic vs.\ Human}
 
 The CIFAR-10 contour experiments demonstrate that Canny edge outlines retain meaningful classification signal: YOLOv8n achieves 70.4\% accuracy from shape alone. However, the $\sim$26\% drop from originals confirms that texture and color remain important complementary cues.
+
+The TU-Berlin sketch results reveal an important distinction between types of shape information. On Canny contours (algorithmically extracted low-level edges), YOLOv8n outperforms DINOv2 by 19 points. On human sketches (semantically meaningful abstractions), DINOv2 outperforms YOLOv8n by 10 points. This reversal suggests that DINOv2's self-supervised features capture \emph{high-level shape semantics} better than low-level edge patterns---consistent with reports that Vision Transformers develop more shape-aware internal representations~\cite{caron2021emerging}.
 
 \subsection{Challenges of Game Character Recognition}
 
@@ -222,7 +281,7 @@ Despite these challenges, YOLOv8n reaches 65.8\%, demonstrating that fine-tuned 
 
 \section{Conclusion}
 
-We compared DINOv2 and YOLOv8n-cls across two tasks: CIFAR-10 classification (with original and contour images) and Overwatch character recognition. YOLOv8n consistently outperforms DINOv2 across all conditions. The CIFAR-10 contour experiments show that shape alone carries substantial but incomplete classification signal, with fine-tuned models much better at exploiting it. On the Overwatch dataset, YOLOv8n achieves 65.8\% on a challenging 14-class problem with limited training data, outperforming DINOv2's 56.5\%. The primary factor across all experiments is training strategy---full fine-tuning vs.\ frozen backbone---rather than architecture (CNN vs.\ ViT).
+We compared DINOv2 and YOLOv8n-cls across three tasks: CIFAR-10 classification (with original and contour images), Overwatch character recognition, and TU-Berlin sketch classification. On photographic and Canny-contour data, YOLOv8n consistently outperforms DINOv2, demonstrating the advantage of full fine-tuning. However, on human-drawn sketches (250 classes), DINOv2 outperforms YOLOv8n by 10 points (74.4\% vs.\ 64.5\%), revealing that self-supervised ViT features are better at capturing abstract, semantic shape information. The picture that emerges is nuanced: training strategy matters (fine-tuning helps on photographic domains), but so does the nature of the shape representation---DINOv2 excels when inputs are abstract and semantic rather than low-level and algorithmic.
 
 \begin{thebibliography}{9}
 \bibitem{geirhos2019imagenet}
@@ -234,6 +293,11 @@ in \textit{Proc.\ ICLR}, 2019.
 M.~Caron, H.~Touvron, I.~Misra, H.~J{\'e}gou, J.~Mairal, P.~Bojanowski, and A.~Joulin,
 ``Emerging properties in self-supervised vision transformers,''
 in \textit{Proc.\ ICCV}, 2021.
+
+\bibitem{eitz2012humans}
+M.~Eitz, J.~Hays, and M.~Alexa,
+``How do humans sketch objects?''
+\textit{ACM Trans.\ Graphics (Proc.\ SIGGRAPH)}, vol.~31, no.~4, 2012.
 \end{thebibliography}
 
 \end{document}
