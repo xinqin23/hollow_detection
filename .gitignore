@@ -1,0 +1,22 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Data (too large for git)
+data/
+
+# YOLO training artifacts
+results/yolo_runs/
+runs/
+yolov8n-cls.pt
+yolo26n.pt
+
+# OS
+.DS_Store
+
+# LaTeX intermediates
+report/*.aux
+report/*.log
+report/*.out
+report/*.synctex.gz
