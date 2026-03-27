@@ -8,6 +8,7 @@ data/
 
 # YOLO training artifacts
 results/yolo_runs/
+results/yolo_overwatch_runs/
 runs/
 yolov8n-cls.pt
 yolo26n.pt
