@@ -17,21 +17,22 @@
 \maketitle
 
 \begin{abstract}
-We investigate how well vision models can classify images using only shape outlines (Canny edge contours) compared to full-color originals. We compare two architectures---DINOv2 (a self-supervised Vision Transformer) and YOLOv8n-cls (a lightweight CNN classifier)---on two datasets: CIFAR-10 (10-class object recognition) and an Overwatch character recognition dataset (14-class game screenshots). On CIFAR-10, both models achieve $\sim$96\% on originals, but diverge on contours: YOLOv8n retains 70.4\% while DINOv2 drops to 51.6\%. On Overwatch, YOLOv8n reaches 65.8\% on originals and 38.1\% on contours, while DINOv2 achieves 56.5\% and 13.4\% respectively. Across both datasets, fine-tuned CNNs consistently leverage shape information more effectively than frozen self-supervised features.
+We investigate how well vision models can classify images using only shape outlines (Canny edge contours) compared to full-color originals. We compare two architectures---DINOv2 (a self-supervised Vision Transformer) and YOLOv8n-cls (a lightweight CNN classifier)---on CIFAR-10 in both original and contour-only form. Both models achieve $\sim$96\% on originals but diverge sharply on contours: YOLOv8n retains 70.4\% while DINOv2 drops to 51.6\%. We further evaluate both models on a custom Overwatch character recognition dataset (14 classes), where YOLOv8n achieves 65.8\% and DINOv2 achieves 56.5\%. Across experiments, fine-tuned CNNs consistently outperform frozen self-supervised features.
 \end{abstract}
 
 \section{Introduction}
 
 A long-standing question in visual recognition is the relative importance of shape versus texture in how neural networks classify objects~\cite{geirhos2019imagenet}. Human perception is strongly shape-biased, yet convolutional neural networks have been shown to rely more on local texture cues. Self-supervised Vision Transformers such as DINO~\cite{caron2021emerging} have been reported to develop more shape-aware representations, attending to object boundaries even without explicit supervision.
 
-In this study, we test this claim empirically by removing all texture and color information from images, leaving only Canny edge contours (hollow outlines). We evaluate on two datasets of different nature:
+In this study, we test this claim empirically using two datasets and two contrasting architectures:
 
+\textbf{Datasets:}
 \begin{itemize}
-    \item \textbf{CIFAR-10}: A standard 10-class object recognition benchmark (50k train, 10k test; native $32\times32$).
-    \item \textbf{Overwatch Frames}: A custom 14-class dataset of game character screenshots (1,309 train, 336 test; native $3420\times2138$), containing both normal and occluded views.
+    \item \textbf{CIFAR-10}: A standard 10-class object recognition benchmark (50k train, 10k test; native $32\times32$). We evaluate on both original images and Canny edge contour versions.
+    \item \textbf{Overwatch Frames}: A custom 14-class dataset of game character screenshots (1,309 train, 336 test; native $3420\times2138$), containing both normal and partially occluded views. We train directly on this dataset to evaluate character recognition.
 \end{itemize}
 
-We compare two contrasting architectures:
+\textbf{Models:}
 \begin{itemize}
     \item \textbf{DINOv2} (ViT-S/14): A frozen self-supervised Vision Transformer with a linear classification head trained on the target data.
     \item \textbf{YOLOv8n-cls}: A lightweight convolutional classifier, fully fine-tuned from pretrained ImageNet weights.
@@ -39,11 +40,9 @@ We compare two contrasting architectures:
 
 \section{Method}
 
-\subsection{Dataset Preparation}
+\subsection{CIFAR-10 Dataset Preparation}
 
-For both datasets, we generate contour versions by: (1) converting to grayscale, (2) applying Canny edge detection (thresholds: 100, 200), and (3) saving the binary edge map as a 3-channel PNG. All images are resized to $224 \times 224$ at training/inference time.
-
-For the Overwatch dataset, images from both the \texttt{normal/} and \texttt{occluded/} subfolders are merged per character, then split 80/20 into train/test sets.
+We use CIFAR-10 (50,000 training images, 10,000 test images across 10 classes). For each image, we generate a contour version by: (1) converting to grayscale, (2) applying Canny edge detection (thresholds: 100, 200), and (3) saving the binary edge map as a 3-channel PNG. All images are resized to $224 \times 224$. Figure~\ref{fig:showcase} shows example pairs.
 
 \begin{figure}[H]
     \centering
@@ -52,10 +51,14 @@ For the Overwatch dataset, images from both the \texttt{normal/} and \texttt{occ
     \label{fig:showcase}
 \end{figure}
 
+\subsection{Overwatch Dataset Preparation}
+
+The Overwatch dataset consists of in-game screenshots of 14 characters: Ashe, Bastion, Cassidy, Echo, Freja, Reaper, Sojourn, Soldier, Sombra, Symmetra, Torbjourn, Tracer, Venture, and Widowmaker. Each character has images from both \texttt{normal} (unobstructed) and \texttt{occluded} (partially hidden) viewpoints. We merge both conditions per character and split 80/20 into train/test sets, yielding approximately 93 training and 24 test images per class. All images are resized to $224 \times 224$. Figure~\ref{fig:ow_showcase} shows examples.
+
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{../results/overwatch_showcase_grid.png}
-    \caption{Overwatch character samples. Top: originals. Bottom: Canny edge contours.}
+    \caption{Overwatch character samples (resized to $224\times224$).}
     \label{fig:ow_showcase}
 \end{figure}
 
@@ -71,7 +74,7 @@ We use the Ultralytics YOLOv8n-cls model, pretrained on ImageNet. All layers are
 
 All experiments were run on a single NVIDIA RTX 6000 Ada Generation (48 GB) with PyTorch 2.6 and CUDA 12.4.
 
-\section{Results: CIFAR-10}
+\section{Results: CIFAR-10 (Original vs.\ Contour)}
 
 \subsection{Overall Accuracy}
 
@@ -135,24 +138,17 @@ Figure~\ref{fig:cifar_perclass} breaks down accuracy by class. On contour images
     \centering
     \caption{Test accuracy (\%) on Overwatch character dataset (14 classes, random baseline = 7.1\%).}
     \label{tab:ow_accuracy}
-    \begin{tabular}{lcc}
+    \begin{tabular}{lc}
         \toprule
-        \textbf{Model} & \textbf{Original} & \textbf{Contour} \\
+        \textbf{Model} & \textbf{Accuracy} \\
         \midrule
-        DINOv2 (ViT-S/14, frozen + linear) & 56.55 & 13.39 \\
-        YOLOv8n-cls (fine-tuned) & 65.77 & 38.10 \\
+        DINOv2 (ViT-S/14, frozen + linear) & 56.55 \\
+        YOLOv8n-cls (fine-tuned) & 65.77 \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-The Overwatch dataset is substantially harder than CIFAR-10: it has more classes (14 vs.\ 10), far fewer training examples ($\sim$93 per class vs.\ 5,000), and the characters share similar in-game environments and visual styles. Even on originals, neither model exceeds 66\%. On contours, DINO drops to 13.4\%---barely above the 7.1\% random baseline---while YOLO retains 38.1\%.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.7\textwidth]{../results/overwatch_accuracy_comparison.png}
-    \caption{Overwatch: Overall accuracy comparison.}
-    \label{fig:ow_accuracy}
-\end{figure}
+The Overwatch dataset is substantially harder than CIFAR-10: it has more classes (14 vs.\ 10), far fewer training examples ($\sim$93 per class vs.\ 5,000), and the characters share similar in-game environments, lighting, and visual styles. Despite this, both models perform well above the 7.1\% random baseline. YOLOv8n outperforms DINOv2 by 9.2 percentage points, consistent with the CIFAR-10 finding that full fine-tuning provides a significant advantage over a frozen backbone with a linear probe.
 
 \subsection{Per-Class Analysis}
 
@@ -162,6 +158,8 @@ The Overwatch dataset is substantially harder than CIFAR-10: it has more classes
     \caption{Overwatch: Per-class accuracy (recall).}
     \label{fig:ow_perclass}
 \end{figure}
+
+Figure~\ref{fig:ow_perclass} shows that character recognition accuracy varies widely across classes. Characters with visually distinctive silhouettes or color schemes (e.g., Bastion, Tracer) tend to be easier, while characters that share similar body types or appear in similar environments are more frequently confused.
 
 \subsection{Confusion Matrices}
 
@@ -183,51 +181,30 @@ The Overwatch dataset is substantially harder than CIFAR-10: it has more classes
 
 \section{Discussion}
 
-\subsection{Cross-Dataset Consistency}
+\subsection{Fine-tuning vs.\ Frozen Features}
 
-The relative ranking of models is consistent across both datasets: YOLOv8n (fine-tuned) outperforms DINOv2 (frozen) on both original and contour images, with the gap widening dramatically on contours. Table~\ref{tab:summary} summarizes the accuracy drops.
+Across both datasets, YOLOv8n-cls (fully fine-tuned) consistently outperforms DINOv2 (frozen backbone + linear probe). On CIFAR-10 originals the gap is small ($<$1\%), but it widens on harder tasks: 19 points on CIFAR-10 contours and 9 points on Overwatch.
 
-\begin{table}[H]
-    \centering
-    \caption{Accuracy drop (\%) from original to contour.}
-    \label{tab:summary}
-    \begin{tabular}{lcc}
-        \toprule
-        \textbf{Model} & \textbf{CIFAR-10 drop} & \textbf{Overwatch drop} \\
-        \midrule
-        DINOv2 & $-44.3$ & $-43.2$ \\
-        YOLOv8n-cls & $-25.6$ & $-27.7$ \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+The key factor is \emph{adaptation}. DINOv2's self-supervised features are powerful general-purpose representations, but a linear probe cannot reshape them for domains that differ substantially from natural images. Full fine-tuning, as in YOLOv8n, allows the model to adapt all layers---including low-level edge detectors and mid-level texture encoders---to the specific characteristics of the target data.
 
-Remarkably, both models lose roughly the same \emph{proportion} of accuracy when switching to contours, regardless of dataset. DINOv2 loses $\sim$44\% (absolute) across both; YOLOv8n loses $\sim$26--28\%.
+\subsection{Shape Information in Contours}
 
-\subsection{Why Does YOLO Outperform DINO on Contours?}
+The CIFAR-10 contour experiments demonstrate that Canny edge outlines retain meaningful classification signal: YOLOv8n achieves 70.4\% accuracy from shape alone. However, the $\sim$26\% drop from originals confirms that texture and color remain important complementary cues.
 
-The key difference lies in the training paradigm:
+\subsection{Challenges of Game Character Recognition}
 
+The Overwatch dataset presents unique challenges:
 \begin{itemize}
-    \item \textbf{DINOv2 (frozen backbone + linear probe)}: The features were learned via self-supervised pretraining on natural images rich in texture and color. When these cues are removed, the frozen representations may not encode the remaining shape information in a linearly separable way. The model cannot adapt its internal representations to the contour domain.
-
-    \item \textbf{YOLOv8n (full fine-tuning)}: All layers are updated during training, allowing the network to adapt its low-level and mid-level features specifically for edge/contour patterns. The convolutional inductive bias (local receptive fields, translation equivariance) may also be better suited to processing sparse edge maps.
+    \item \textbf{Small training set}: $\sim$93 images per class limits what both models can learn.
+    \item \textbf{Shared visual context}: All characters appear in similar game environments, so the model must rely on character-specific features rather than background cues.
+    \item \textbf{Occlusion}: The inclusion of partially occluded views adds within-class variability and makes recognition harder.
 \end{itemize}
 
-\subsection{Implications}
-
-\begin{enumerate}
-    \item \textbf{Frozen SSL features are domain-sensitive}: DINOv2's general-purpose representations degrade substantially when the input distribution shifts from natural images to binary edge maps. This holds across both a standard benchmark (CIFAR-10) and a domain-specific dataset (Overwatch).
-
-    \item \textbf{Shape alone is partially sufficient}: YOLOv8n achieves 70\% on CIFAR-10 contours and 38\% on Overwatch contours (vs.\ 7.1\% random), demonstrating that Canny edges retain meaningful classification signal.
-
-    \item \textbf{Adaptation matters more than architecture}: The consistent advantage of YOLO over DINO on contours is primarily due to fine-tuning vs.\ frozen features, not CNN vs.\ ViT architecture.
-
-    \item \textbf{Small datasets amplify the gap}: On Overwatch ($\sim$93 images/class), the limited data makes it even harder for a frozen linear probe to find a good decision boundary, especially in the unfamiliar contour domain.
-\end{enumerate}
+Despite these challenges, YOLOv8n reaches 65.8\%, demonstrating that fine-tuned models can learn character-discriminative features even from limited data.
 
 \section{Conclusion}
 
-We compared DINOv2 and YOLOv8n-cls on classifying images from two datasets---CIFAR-10 and Overwatch character screenshots---in both original form and as Canny edge contours. Across both datasets, YOLOv8n (fine-tuned) consistently outperforms DINOv2 (frozen) on contours by $\sim$19--25 percentage points, while the two models perform comparably or with a smaller gap on originals. The primary factor is training strategy (fine-tuning vs.\ frozen backbone), not architecture. Future work could explore fine-tuning DINOv2's backbone, using adapter layers, or testing with larger training sets.
+We compared DINOv2 and YOLOv8n-cls across two tasks: CIFAR-10 classification (with original and contour images) and Overwatch character recognition. YOLOv8n consistently outperforms DINOv2 across all conditions. The CIFAR-10 contour experiments show that shape alone carries substantial but incomplete classification signal, with fine-tuned models much better at exploiting it. On the Overwatch dataset, YOLOv8n achieves 65.8\% on a challenging 14-class problem with limited training data, outperforming DINOv2's 56.5\%. The primary factor across all experiments is training strategy---full fine-tuning vs.\ frozen backbone---rather than architecture (CNN vs.\ ViT).
 
 \begin{thebibliography}{9}
 \bibitem{geirhos2019imagenet}

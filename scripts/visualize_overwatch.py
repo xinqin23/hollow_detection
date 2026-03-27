@@ -1,5 +1,5 @@
 """
-Generate comparison plots for DINO vs YOLO on Overwatch frames (original vs contour).
+Generate plots for DINO vs YOLO on Overwatch frames (original only, no contour).
 """
 import json
 import numpy as np
@@ -7,64 +7,56 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pathlib import Path
+from PIL import Image
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
 
 CLASSES = sorted([d.name for d in (DATA_ROOT / "overwatch_original" / "train").iterdir() if d.is_dir()])
 
+
 def load_results():
     data = {}
-    for name in ["dino_overwatch_original", "dino_overwatch_contour",
-                  "yolo_overwatch_original", "yolo_overwatch_contour"]:
+    for name in ["dino_overwatch_original", "yolo_overwatch_original"]:
         with open(RESULTS_DIR / f"{name}.json") as f:
             data[name] = json.load(f)
     return data
 
-def plot_accuracy_comparison(data):
-    fig, ax = plt.subplots(figsize=(8, 5))
-    models = ["DINOv2", "YOLOv8n-cls"]
-    original = [data["dino_overwatch_original"]["final_test_accuracy"],
-                data["yolo_overwatch_original"]["final_test_accuracy"]]
-    contour = [data["dino_overwatch_contour"]["final_test_accuracy"],
-               data["yolo_overwatch_contour"]["final_test_accuracy"]]
 
-    x = np.arange(len(models))
-    w = 0.3
-    bars1 = ax.bar(x - w/2, [v*100 for v in original], w, label="Original", color="#4C72B0")
-    bars2 = ax.bar(x + w/2, [v*100 for v in contour], w, label="Contour", color="#DD8452")
+def plot_accuracy_comparison(data):
+    fig, ax = plt.subplots(figsize=(6, 5))
+    models = ["DINOv2", "YOLOv8n-cls"]
+    accs = [data["dino_overwatch_original"]["final_test_accuracy"] * 100,
+            data["yolo_overwatch_original"]["final_test_accuracy"] * 100]
+
+    colors = ["#4C72B0", "#DD8452"]
+    bars = ax.bar(models, accs, color=colors, width=0.5)
 
     ax.set_ylabel("Accuracy (%)", fontsize=12)
-    ax.set_title("Overwatch Character Classification: Original vs Contour", fontsize=13)
-    ax.set_xticks(x)
-    ax.set_xticklabels(models, fontsize=12)
+    ax.set_title("Overwatch Character Classification (14 classes)", fontsize=13)
     ax.set_ylim(0, 80)
-    ax.legend(fontsize=11)
-    # Random baseline
-    ax.axhline(y=100/len(CLASSES), color='gray', linestyle='--', alpha=0.5, label=f'Random ({100/len(CLASSES):.1f}%)')
-    ax.legend(fontsize=10)
+    ax.axhline(y=100/len(CLASSES), color='gray', linestyle='--', alpha=0.5)
+    ax.text(1.3, 100/len(CLASSES)+1, f'Random ({100/len(CLASSES):.1f}%)', fontsize=9, color='gray')
 
-    for bars in [bars1, bars2]:
-        for bar in bars:
-            h = bar.get_height()
-            ax.annotate(f"{h:.1f}%", xy=(bar.get_x() + bar.get_width()/2, h),
-                        xytext=(0, 4), textcoords="offset points",
-                        ha="center", fontsize=10, fontweight="bold")
+    for bar in bars:
+        h = bar.get_height()
+        ax.annotate(f"{h:.1f}%", xy=(bar.get_x() + bar.get_width()/2, h),
+                    xytext=(0, 4), textcoords="offset points",
+                    ha="center", fontsize=11, fontweight="bold")
 
     plt.tight_layout()
     plt.savefig(RESULTS_DIR / "overwatch_accuracy_comparison.png", dpi=150, bbox_inches="tight")
     print("Saved overwatch_accuracy_comparison.png")
 
+
 def plot_confusion_matrices(data):
-    fig, axes = plt.subplots(2, 2, figsize=(18, 16))
+    fig, axes = plt.subplots(1, 2, figsize=(18, 8))
     configs = [
-        ("dino_overwatch_original", "DINOv2 — Original"),
-        ("dino_overwatch_contour", "DINOv2 — Contour"),
-        ("yolo_overwatch_original", "YOLOv8n — Original"),
-        ("yolo_overwatch_contour", "YOLOv8n — Contour"),
+        ("dino_overwatch_original", "DINOv2 (frozen + linear)"),
+        ("yolo_overwatch_original", "YOLOv8n-cls (fine-tuned)"),
     ]
 
-    for ax, (key, title) in zip(axes.flat, configs):
+    for ax, (key, title) in zip(axes, configs):
         cm = np.array(data[key]["confusion_matrix"])
         cm_norm = cm.astype(float) / cm.sum(axis=1, keepdims=True) * 100
         im = ax.imshow(cm_norm, interpolation="nearest", cmap="Blues", vmin=0, vmax=100)
@@ -88,41 +80,39 @@ def plot_confusion_matrices(data):
     plt.savefig(RESULTS_DIR / "overwatch_confusion_matrices.png", dpi=150, bbox_inches="tight")
     print("Saved overwatch_confusion_matrices.png")
 
+
 def plot_per_class_accuracy(data):
-    fig, ax = plt.subplots(figsize=(16, 6))
+    fig, ax = plt.subplots(figsize=(14, 6))
     configs = [
-        ("dino_overwatch_original", "DINOv2 Original", "#4C72B0"),
-        ("dino_overwatch_contour", "DINOv2 Contour", "#8DA0CB"),
-        ("yolo_overwatch_original", "YOLOv8n Original", "#DD8452"),
-        ("yolo_overwatch_contour", "YOLOv8n Contour", "#E5BA73"),
+        ("dino_overwatch_original", "DINOv2 (frozen + linear)", "#4C72B0"),
+        ("yolo_overwatch_original", "YOLOv8n-cls (fine-tuned)", "#DD8452"),
     ]
 
     x = np.arange(len(CLASSES))
-    w = 0.2
+    w = 0.35
     for i, (key, label, color) in enumerate(configs):
         report = data[key]["classification_report"]
         accs = [report[cls]["recall"] * 100 for cls in CLASSES]
-        ax.bar(x + i*w - 1.5*w, accs, w, label=label, color=color)
+        ax.bar(x + i*w - w/2, accs, w, label=label, color=color)
 
     ax.set_ylabel("Recall / Per-class Accuracy (%)", fontsize=11)
     ax.set_title("Overwatch: Per-Class Accuracy Comparison", fontsize=14)
     ax.set_xticks(x)
     ax.set_xticklabels(CLASSES, fontsize=9, rotation=30, ha="right")
     ax.set_ylim(0, 105)
-    ax.legend(fontsize=9, loc="upper right")
+    ax.legend(fontsize=10)
     ax.grid(axis="y", alpha=0.3)
 
     plt.tight_layout()
     plt.savefig(RESULTS_DIR / "overwatch_per_class_accuracy.png", dpi=150, bbox_inches="tight")
     print("Saved overwatch_per_class_accuracy.png")
 
+
 def plot_training_curves(data):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     configs = [
-        ("dino_overwatch_original", "DINOv2 Original", "#4C72B0", "-"),
-        ("dino_overwatch_contour", "DINOv2 Contour", "#8DA0CB", "--"),
-        ("yolo_overwatch_original", "YOLOv8n Original", "#DD8452", "-"),
-        ("yolo_overwatch_contour", "YOLOv8n Contour", "#E5BA73", "--"),
+        ("dino_overwatch_original", "DINOv2", "#4C72B0", "-"),
+        ("yolo_overwatch_original", "YOLOv8n-cls", "#DD8452", "-"),
     ]
 
     for key, label, color, ls in configs:
@@ -136,34 +126,31 @@ def plot_training_curves(data):
             ax2.plot(epochs, vals, label=label, color=color, ls=ls, lw=2)
 
     ax1.set_xlabel("Epoch"); ax1.set_ylabel("Training Loss")
-    ax1.set_title("Training Loss Over Epochs"); ax1.legend(fontsize=9); ax1.grid(alpha=0.3)
+    ax1.set_title("Training Loss Over Epochs"); ax1.legend(fontsize=10); ax1.grid(alpha=0.3)
     ax2.set_xlabel("Epoch"); ax2.set_ylabel("Accuracy (%)")
-    ax2.set_title("Validation Accuracy Over Epochs"); ax2.legend(fontsize=9); ax2.grid(alpha=0.3)
+    ax2.set_title("Validation Accuracy Over Epochs"); ax2.legend(fontsize=10); ax2.grid(alpha=0.3)
 
     plt.tight_layout()
     plt.savefig(RESULTS_DIR / "overwatch_training_curves.png", dpi=150, bbox_inches="tight")
     print("Saved overwatch_training_curves.png")
 
+
 def plot_showcase():
-    """Show one original+contour sample per class."""
-    from PIL import Image
-    fig, axes = plt.subplots(2, len(CLASSES), figsize=(24, 5))
-    fig.suptitle("Overwatch: Original (top) vs Canny Contour (bottom)", fontsize=16, y=1.02)
+    fig, axes = plt.subplots(1, len(CLASSES), figsize=(24, 3))
+    fig.suptitle("Overwatch Character Samples", fontsize=16, y=1.05)
 
     for i, cls in enumerate(CLASSES):
         orig_dir = DATA_ROOT / "overwatch_original" / "test" / cls
-        cont_dir = DATA_ROOT / "overwatch_contour" / "test" / cls
         imgs = sorted(orig_dir.glob("*.png"))
         if imgs:
-            axes[0, i].imshow(Image.open(imgs[0]))
-            axes[1, i].imshow(Image.open(cont_dir / imgs[0].name))
-        axes[0, i].set_title(cls, fontsize=8)
-        axes[0, i].axis("off")
-        axes[1, i].axis("off")
+            axes[i].imshow(Image.open(imgs[0]))
+        axes[i].set_title(cls, fontsize=8)
+        axes[i].axis("off")
 
     plt.tight_layout()
     plt.savefig(RESULTS_DIR / "overwatch_showcase_grid.png", dpi=150, bbox_inches="tight")
     print("Saved overwatch_showcase_grid.png")
+
 
 if __name__ == "__main__":
     data = load_results()
