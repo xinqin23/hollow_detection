@@ -254,6 +254,22 @@ Notably, DINOv2 \emph{outperforms} YOLOv8n by nearly 10 percentage points on ske
     \label{fig:sketch_curves}
 \end{figure}
 
+\subsection{Qualitative Examples}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../results/sketch_correct_examples.png}
+    \caption{Correctly classified sketches by YOLOv8n. These examples show categories with distinctive, unambiguous shapes that the model handles well.}
+    \label{fig:sketch_correct}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{../results/sketch_incorrect_examples.png}
+    \caption{Misclassified sketches by YOLOv8n. Labels show ``True $\to$ Predicted''. Errors often involve visually similar categories or highly abstract drawings.}
+    \label{fig:sketch_incorrect}
+\end{figure}
+
 \section{Discussion}
 
 \subsection{Fine-tuning vs.\ Frozen Features}
